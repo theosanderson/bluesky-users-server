@@ -170,14 +170,25 @@ spec:
       initContainers:
       - name: install-requirements
         image: python:3.11-slim
-        command: ["pip", "install", "-r", "/app/requirements.txt"]
+        command: 
+        - /bin/sh
+        - -c
+        - |
+          python -m pip install --target=/pythonpath -r /app/requirements.txt
         volumeMounts:
         - name: code
           mountPath: /app
+        - name: pythonpath
+          mountPath: /pythonpath
       containers:
       - name: counter
         image: python:3.11-slim
-        command: ["python", "/app/server.py"]
+        command: 
+        - /bin/sh
+        - -c
+        - |
+          export PYTHONPATH=/pythonpath
+          python /app/server.py
         ports:
         - containerPort: 8080
         resources:
@@ -190,6 +201,8 @@ spec:
         volumeMounts:
         - name: code
           mountPath: /app
+        - name: pythonpath
+          mountPath: /pythonpath
         livenessProbe:
           httpGet:
             path: /health
@@ -206,6 +219,8 @@ spec:
       - name: code
         configMap:
           name: bsky-counter-code
+      - name: pythonpath
+        emptyDir: {}
 
 ---
 apiVersion: v1
