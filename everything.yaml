@@ -1,0 +1,222 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: bluesky
+  name: bsky-counter-code
+data:
+  requirements.txt: |
+    flask==3.0.0
+    requests==2.31.0
+
+  counter.py: |
+    import requests
+    import time
+    import json
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    # PDS hosts
+    PDS_HOSTS = [
+        "https://morel.us-east.host.bsky.network",
+        "https://puffball.us-east.host.bsky.network",
+        "https://inkcap.us-east.host.bsky.network",
+        "https://oyster.us-east.host.bsky.network",
+        "https://enoki.us-east.host.bsky.network",
+        "https://porcini.us-east.host.bsky.network",
+        "https://shimeji.us-east.host.bsky.network",
+        "https://amanita.us-east.host.bsky.network",
+        "https://lionsmane.us-east.host.bsky.network",
+        "https://shiitake.us-east.host.bsky.network",
+        "https://blewit.us-west.host.bsky.network",
+        "https://conocybe.us-west.host.bsky.network",
+        "https://boletus.us-west.host.bsky.network",
+        "https://lepista.us-west.host.bsky.network",
+        "https://chaga.us-west.host.bsky.network",
+        "https://agaric.us-west.host.bsky.network",
+        "https://maitake.us-west.host.bsky.network",
+        "https://verpa.us-west.host.bsky.network",
+        "https://russula.us-west.host.bsky.network",
+        "https://hydnum.us-west.host.bsky.network"
+    ]
+
+    def get_user_count_from_pds(host, cursor=None):
+        url = f"{host}/xrpc/com.atproto.sync.listRepos"
+        headers = {
+            "User-Agent": "UserCountScript/1.0"
+        }
+        params = {
+            "limit": 1000
+        }
+        if cursor:
+            params["cursor"] = cursor
+
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+            response.raise_for_status()
+
+            data = response.json()
+            repos = data.get("repos", [])
+            user_count = sum(1 for repo in repos if repo.get("active") == True)
+            page_size = len(repos)
+            next_cursor = data.get("cursor")
+            return user_count, page_size, next_cursor
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching data from {host}: {e}")
+            return None, None, None
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON from {host}: {e}")
+            return None, None, None
+
+    def process_pds(host):
+        print(f"Fetching user count from {host}...")
+        user_count = 0
+        cursor = None
+
+        while True:
+            current_count, _, next_cursor = get_user_count_from_pds(host, cursor)
+
+            if current_count is None:
+                print(f"Failed to get user count from {host}. Skipping.")
+                return None
+
+            user_count += current_count
+            cursor = next_cursor
+
+            if not cursor:
+                print(f"Finished counting users for {host}. Total: {user_count}")
+                return user_count
+
+            time.sleep(0.2)
+
+    def get_total_user_count(pds_hosts):
+        total_user_count = 0
+
+        with ThreadPoolExecutor(max_workers=len(pds_hosts)) as executor:
+            future_to_host = {executor.submit(process_pds, host): host for host in pds_hosts}
+
+            for future in as_completed(future_to_host):
+                host = future_to_host[future]
+                try:
+                    user_count = future.result()
+                    if user_count is not None:
+                        total_user_count += user_count
+                    else:
+                        print(f"Error processing {host}, result was None")
+                        return -1
+                except Exception as exc:
+                    print(f"Error processing {host}: {exc}")
+                    return -1
+
+        return total_user_count
+
+  server.py: |
+    from flask import Flask, jsonify
+    import threading
+    import time
+    from counter import get_total_user_count, PDS_HOSTS
+
+    app = Flask(__name__)
+
+    # Global store for the user count
+    current_user_count = 0
+    update_interval = 3600  # Update every hour
+
+    def update_count():
+        """Background task to periodically update the user count"""
+        global current_user_count
+        while True:
+            count = get_total_user_count(PDS_HOSTS)
+            if count != -1:
+                current_user_count = count
+            time.sleep(update_interval)
+
+    @app.route('/health')
+    def health():
+        """Health check endpoint"""
+        return jsonify({"status": "healthy"})
+
+    @app.route('/metrics')
+    def metrics():
+        """Endpoint to get the current user count"""
+        return jsonify({"total_users": current_user_count})
+
+    if __name__ == '__main__':
+        # Start the background update thread
+        update_thread = threading.Thread(target=update_count, daemon=True)
+        update_thread.start()
+        
+        # Start the Flask server
+        app.run(host='0.0.0.0', port=8080)
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: bluesky
+  name: bsky-counter
+  labels:
+    app: bsky-counter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bsky-counter
+  template:
+    metadata:
+      labels:
+        app: bsky-counter
+    spec:
+      initContainers:
+      - name: install-requirements
+        image: python:3.11-slim
+        command: ["pip", "install", "-r", "/app/requirements.txt"]
+        volumeMounts:
+        - name: code
+          mountPath: /app
+      containers:
+      - name: counter
+        image: python:3.11-slim
+        command: ["python", "/app/server.py"]
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        volumeMounts:
+        - name: code
+          mountPath: /app
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 15
+      volumes:
+      - name: code
+        configMap:
+          name: bsky-counter-code
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bsky-counter
+  namespace: bluesky
+spec:
+  selector:
+    app: bsky-counter
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP
