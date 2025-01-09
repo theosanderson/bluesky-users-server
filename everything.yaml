@@ -13,30 +13,82 @@ data:
     import requests
     import time
     import json
+    import logging
     from concurrent.futures import ThreadPoolExecutor, as_completed
+    
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
 
     # PDS hosts
     PDS_HOSTS = [
-        "https://morel.us-east.host.bsky.network",
-        "https://puffball.us-east.host.bsky.network",
-        "https://inkcap.us-east.host.bsky.network",
-        "https://oyster.us-east.host.bsky.network",
-        "https://enoki.us-east.host.bsky.network",
-        "https://porcini.us-east.host.bsky.network",
-        "https://shimeji.us-east.host.bsky.network",
-        "https://amanita.us-east.host.bsky.network",
-        "https://lionsmane.us-east.host.bsky.network",
-        "https://shiitake.us-east.host.bsky.network",
-        "https://blewit.us-west.host.bsky.network",
-        "https://conocybe.us-west.host.bsky.network",
-        "https://boletus.us-west.host.bsky.network",
-        "https://lepista.us-west.host.bsky.network",
-        "https://chaga.us-west.host.bsky.network",
-        "https://agaric.us-west.host.bsky.network",
-        "https://maitake.us-west.host.bsky.network",
-        "https://verpa.us-west.host.bsky.network",
-        "https://russula.us-west.host.bsky.network",
-        "https://hydnum.us-west.host.bsky.network"
+       "https://morel.us-east.host.bsky.network",
+      "https://puffball.us-east.host.bsky.network",
+      "https://inkcap.us-east.host.bsky.network",
+      "https://oyster.us-east.host.bsky.network",
+      "https://enoki.us-east.host.bsky.network",
+      "https://porcini.us-east.host.bsky.network",
+      "https://shimeji.us-east.host.bsky.network",
+      "https://amanita.us-east.host.bsky.network",
+      "https://lionsmane.us-east.host.bsky.network",
+      "https://shiitake.us-east.host.bsky.network",
+      "https://blewit.us-west.host.bsky.network",
+      "https://conocybe.us-west.host.bsky.network",
+      "https://boletus.us-west.host.bsky.network",
+      "https://lepista.us-west.host.bsky.network",
+      "https://chaga.us-west.host.bsky.network",
+      "https://agaric.us-west.host.bsky.network",
+      "https://maitake.us-west.host.bsky.network",
+      "https://verpa.us-west.host.bsky.network",
+      "https://russula.us-west.host.bsky.network",
+      "https://hydnum.us-west.host.bsky.network",
+      "https://coral.us-east.host.bsky.network",
+      "https://lobster.us-east.host.bsky.network",
+      "https://magic.us-west.host.bsky.network",
+      "https://woodear.us-west.host.bsky.network",
+      "https://cordyceps.us-west.host.bsky.network",
+      "https://ganoderma.us-west.host.bsky.network",
+      "https://bracket.us-west.host.bsky.network",
+      "https://button.us-west.host.bsky.network",
+      "https://chanterelle.us-west.host.bsky.network",
+      "https://cremini.us-west.host.bsky.network",
+      "https://gomphus.us-west.host.bsky.network",
+      "https://matsutake.us-west.host.bsky.network",
+      "https://milkcap.us-west.host.bsky.network",
+      "https://shaggymane.us-west.host.bsky.network",
+      "https://stinkhorn.us-west.host.bsky.network",
+      "https://witchesbutter.us-west.host.bsky.network",
+      "https://earthstar.us-east.host.bsky.network",
+      "https://meadow.us-east.host.bsky.network",
+      "https://parasol.us-east.host.bsky.network",
+      "https://reishi.us-east.host.bsky.network",
+      "https://scarletina.us-east.host.bsky.network",
+      "https://splitgill.us-east.host.bsky.network",
+      "https://truffle.us-east.host.bsky.network",
+      "https://velvetfoot.us-east.host.bsky.network",
+      "https://helvella.us-east.host.bsky.network",
+      "https://panthercap.us-east.host.bsky.network",
+      "https://yellowfoot.us-west.host.bsky.network",
+      "https://blusher.us-east.host.bsky.network",
+      "https://brittlegill.us-west.host.bsky.network",
+      "https://fibercap.us-west.host.bsky.network",
+      "https://poisonpie.us-west.host.bsky.network",
+      "https://oysterling.us-west.host.bsky.network",
+      "https://woodtuft.us-west.host.bsky.network",
+      "https://scalycap.us-west.host.bsky.network",
+      "https://elfcup.us-east.host.bsky.network",
+      "https://grisette.us-west.host.bsky.network",
+      "https://mottlegill.us-west.host.bsky.network",
+      "https://polypore.us-west.host.bsky.network",
+      "https://waxcap.us-west.host.bsky.network",
+      "https://suillus.us-west.host.bsky.network",
+      "https://rooter.us-west.host.bsky.network",
+      "https://mycena.us-west.host.bsky.network",
+      "https://dapperling.us-west.host.bsky.network",
+      "https://goldenear.us-west.host.bsky.network",
+      "https://pioppino.us-west.host.bsky.network",
     ]
 
     def get_user_count_from_pds(host, cursor=None):
@@ -62,31 +114,39 @@ data:
             return user_count, page_size, next_cursor
 
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching data from {host}: {e}")
+            logging.error(f"Error fetching data from {host}: {e}")
             return None, None, None
         except json.JSONDecodeError as e:
-            print(f"Error decoding JSON from {host}: {e}")
+            logging.error(f"Error decoding JSON from {host}: {e}")
             return None, None, None
 
     def process_pds(host):
-        print(f"Fetching user count from {host}...")
+        logging.info(f"Fetching user count from {host}...")
         user_count = 0
         cursor = None
-
+        last_logged_magnitude = 0  # Track the order of magnitude of last logging
+        
         while True:
             current_count, _, next_cursor = get_user_count_from_pds(host, cursor)
-
-            if current_count is None:
-                print(f"Failed to get user count from {host}. Skipping.")
+            
+            if current_count is None:  # Fixed typo in 'current_unt'
+                logging.warning(f"Failed to get user count from {host}. Skipping.")
                 return None
-
+            
             user_count += current_count
+            current_magnitude = len(str(user_count)) - 1  # Get current order of magnitude
+            
+            # Log if we've crossed a power of 10
+            if current_magnitude > last_logged_magnitude:
+                logging.info(f"User count for {host} has reached {user_count:,}")
+                last_logged_magnitude = current_magnitude
+            
             cursor = next_cursor
-
+            
             if not cursor:
-                print(f"Finished counting users for {host}. Total: {user_count}")
+                logging.info(f"Finished counting users for {host}. Total: {user_count:,}")
                 return user_count
-
+            
             time.sleep(0.2)
 
     def get_total_user_count(pds_hosts):
@@ -102,10 +162,10 @@ data:
                     if user_count is not None:
                         total_user_count += user_count
                     else:
-                        print(f"Error processing {host}, result was None")
+                        logging.error(f"Error processing {host}, result was None")
                         return -1
                 except Exception as exc:
-                    print(f"Error processing {host}: {exc}")
+                    logging.error(f"Error processing {host}: {exc}")
                     return -1
 
         return total_user_count
@@ -114,6 +174,13 @@ data:
     from flask import Flask, jsonify
     import threading
     import time
+    import logging
+    
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
     from counter import get_total_user_count, PDS_HOSTS
 
     app = Flask(__name__)
@@ -126,9 +193,14 @@ data:
         """Background task to periodically update the user count"""
         global current_user_count
         while True:
+            logging.info("Starting user count update...")
             count = get_total_user_count(PDS_HOSTS)
             if count != -1:
                 current_user_count = count
+                logging.info(f"Updated total user count: {count}")
+            else:
+                logging.error("Failed to update user count")
+            logging.info(f"Sleeping for {update_interval} seconds before next update")
             time.sleep(update_interval)
 
     @app.route('/health')
@@ -235,3 +307,31 @@ spec:
   - port: 80
     targetPort: 8080
   type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bsky-counter-ingress
+  namespace: bluesky
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: bsky-counter.c.theo.io
+    http:
+      paths:
+      - backend:
+          service:
+            name: bsky-counter
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - bsky-counter.c.theo.io
+    secretName: bsky-tls-counter
